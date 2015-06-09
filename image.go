@@ -13,8 +13,10 @@ import (
 
 	// require
 	_ "image/gif"
+	_ "image/jpeg"
 	_ "image/png"
 
+	"github.com/ChimeraCoder/anaconda"
 	"github.com/boltdb/bolt"
 	"github.com/joeshaw/envdecode"
 )
@@ -67,9 +69,42 @@ type CseSearchResult struct {
 }
 
 /*
+StartBot we will start bot!
+*/
+func StartBot(imgch <-chan *image.Image) {
+
+	var env struct {
+		ConsumerKey       string `env:"TWITTER_CONSUMER_KEY"`
+		ConsumerSecret    string `env:"TWITTER_CONSUMER_SECRET"`
+		AccessToken       string `env:"TWITTER_ACCESS_TOKEN"`
+		AccessTokenSecret string `env:"TWITTER_ACCESS_TOKEN_SECRET"`
+	}
+
+	if err := envdecode.Decode(&env); err != nil {
+		log.Printf("Error: %v", err)
+	}
+
+	anaconda.SetConsumerKey(env.ConsumerKey)
+	anaconda.SetConsumerSecret(env.ConsumerSecret)
+	api := anaconda.NewTwitterApi(env.AccessToken, env.AccessTokenSecret)
+
+	go func() {
+
+		var v url.Values
+
+		for {
+			img := <-imgch
+			log.Printf("img: %v", img)
+			api.PostTweet("go is god", v)
+		}
+
+	}()
+}
+
+/*
 NewSearchImageChan Get new image channel
 */
-func NewSearchImageChan(db *bolt.DB, stopch <-chan struct{}) <-chan *image.Image {
+func NewSearchImageChan(db *bolt.DB) <-chan *image.Image {
 
 	db.Update(createSearchImageBuckets)
 
@@ -85,17 +120,8 @@ func NewSearchImageChan(db *bolt.DB, stopch <-chan struct{}) <-chan *image.Image
 
 			log.Printf("Now: %s", now)
 
-			select {
-
-			case <-stopch:
-				break
-
-			default:
-
-				//cseSearch(img)
-				ch <- &img
-
-			}
+			//cseSearch(img)
+			ch <- &img
 
 		}
 

@@ -16,17 +16,15 @@ func TestNewSearchImageChan(t *testing.T) {
 	t.SkipNow()
 
 	var (
-		stopch   = make(chan struct{})
 		db       *bolt.DB
 		gigimgch <-chan *image.Image
 	)
 
 	db, _ = bolt.Open("test.boltdb", 0666, nil)
-	gigimgch = NewSearchImageChan(db, stopch)
+	gigimgch = NewSearchImageChan(db)
 
 	time.Sleep(1 * time.Second)
 
-	stopch <- struct{}{}
 	<-gigimgch
 }
 
@@ -65,7 +63,7 @@ func TestDrawGopher(t *testing.T) {
 	f, e := os.Create("go.png")
 	defer f.Close()
 
-	log.Printf("Error: ", e)
+	log.Printf("Error: %v", e)
 
 	png.Encode(f, *gigimg)
 }

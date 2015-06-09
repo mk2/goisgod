@@ -1,6 +1,9 @@
 package main
 
-import "github.com/boltdb/bolt"
+import (
+	"github.com/boltdb/bolt"
+	"github.com/mk2/goisgod"
+)
 
 func main() {
 
@@ -8,6 +11,9 @@ func main() {
 	defer db.Close()
 
 	go func() {
+
+		ch := goisgod.NewSearchImageChan(db)
+		goisgod.StartBot(ch)
 
 	}()
 }
