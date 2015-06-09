@@ -3,6 +3,7 @@ package goisgod
 import (
 	"encoding/json"
 	"image"
+	"image/draw"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -142,9 +143,22 @@ func cseSearch(img *image.Image) func(*bolt.Tx) error {
 	}
 }
 
+func drawGopher(_dst *image.Image, _gopher *image.Image) error {
+
+	var (
+		dst    = (*_dst).(draw.Image)
+		gopher = (*_gopher).(draw.Image)
+	)
+
+	draw.Draw(dst, dst.Bounds(), gopher, image.ZP, draw.Over)
+
+	return nil
+}
+
 func getGopherImage() *image.Image {
 
 	f, _ := os.Open("gopher-normal.gif")
+	defer f.Close()
 	img, _, _ := image.Decode(f)
 
 	return &img

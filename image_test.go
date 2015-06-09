@@ -2,6 +2,9 @@ package goisgod
 
 import (
 	"image"
+	"image/png"
+	"log"
+	"os"
 	"testing"
 	"time"
 
@@ -46,4 +49,23 @@ func TestCseSearchItemToGIGImage(t *testing.T) {
 	if gigimg == nil {
 		t.Errorf("Gigimage is nil")
 	}
+}
+
+func TestDrawGopher(t *testing.T) {
+
+	var res CseSearchItem
+	res.Image.ThumbnailLink = "http://ks.c.yimg.jp/res/chie-ans-329/329/831/301/i320"
+
+	gigimg := cseSearchItemToGIGImage(&res)
+
+	goimg := getGopherImage()
+
+	drawGopher(gigimg, goimg)
+
+	f, e := os.Create("go.png")
+	defer f.Close()
+
+	log.Printf("Error: ", e)
+
+	png.Encode(f, *gigimg)
 }
