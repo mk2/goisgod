@@ -1,6 +1,7 @@
-package goisgod
+package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"image"
 	"image/draw"
@@ -13,9 +14,10 @@ import (
 
 	// require
 	_ "image/gif"
-	_ "image/jpeg"
+	"image/jpeg"
 	_ "image/png"
 
+	"encoding/base64"
 	"github.com/ChimeraCoder/anaconda"
 	"github.com/boltdb/bolt"
 	"github.com/joeshaw/envdecode"
@@ -25,8 +27,8 @@ const (
 	// CseSearchStartIndexBucket store search start index
 	CseSearchStartIndexBucket = "CseSearchStartIndexBucket"
 
-	// CseUsedImageIndexBucket already used iamge index stored
-	CseUsedImageIndexBucket = "CseUsedImageIndexBucket"
+	// CseUsedImageLinkBucket already used iamge index stored
+	CseUsedImageLinkBucket = "CseUsedImageLinkBucket"
 )
 
 const (
@@ -88,17 +90,24 @@ func StartBot(imgch <-chan *image.Image) {
 	anaconda.SetConsumerSecret(env.ConsumerSecret)
 	api := anaconda.NewTwitterApi(env.AccessToken, env.AccessTokenSecret)
 
-	go func() {
+	for {
+		img := <-imgch
+		goimg := getGopherImage()
+		drawGopher(img, goimg)
 
-		var v url.Values
-
-		for {
-			img := <-imgch
-			log.Printf("img: %v", img)
-			api.PostTweet("go is god", v)
+		imgBuf := new(bytes.Buffer)
+		if err := jpeg.Encode(imgBuf, *img, nil); err != nil {
+			log.Fatalf("Jpeg encode failed")
+			continue
 		}
 
-	}()
+		b64s := base64.StdEncoding.EncodeToString(imgBuf.Bytes())
+
+		media, _ := api.UploadMedia(b64s)
+		v := url.Values{}
+		v.Add("media_ids", media.MediaIDString)
+		api.PostTweet("go is god", v)
+	}
 }
 
 /*
@@ -114,13 +123,13 @@ func NewSearchImageChan(db *bolt.DB) <-chan *image.Image {
 
 		var img image.Image
 
-		c := time.Tick(1 * time.Second)
+		c := time.Tick(10 * time.Second)
 
 		for now := range c {
 
 			log.Printf("Now: %s", now)
 
-			//cseSearch(img)
+			db.Update(cseSearch(&img))
 			ch <- &img
 
 		}
@@ -144,26 +153,53 @@ func cseSearch(img *image.Image) func(*bolt.Tx) error {
 		log.Printf("oh my god")
 	}
 
-	q := url.Values{}
-	q.Set("q", "go is god")
-	q.Set("cx", env.Cx)
-	q.Set("searchType", "image")
-	q.Set("key", env.Key)
-
-	reqURL := CseEndpoint + "?" + q.Encode()
-	log.Printf("reqURL: %s", reqURL)
-
-	resp, _ := http.Get(reqURL)
-	bytes, _ := ioutil.ReadAll(resp.Body)
-
-	var result CseSearchResult
-	json.Unmarshal(bytes, &result)
-
-	for _, i := range result.Items {
-		log.Printf("Item: %v", i)
-	}
-
 	return func(tx *bolt.Tx) error {
+
+		var cseItem CseSearchItem
+
+		for {
+
+			q := url.Values{}
+			q.Set("q", "go is god")
+			q.Set("cx", env.Cx)
+			q.Set("searchType", "image")
+			q.Set("key", env.Key)
+
+			reqURL := CseEndpoint + "?" + q.Encode()
+			log.Printf("reqURL: %s", reqURL)
+
+			resp, _ := http.Get(reqURL)
+			bs, _ := ioutil.ReadAll(resp.Body)
+
+			var result CseSearchResult
+			json.Unmarshal(bs, &result)
+
+			b := tx.Bucket([]byte(CseUsedImageLinkBucket))
+			c := b.Cursor()
+			found := false
+
+			for _, i := range result.Items {
+				cseItem = i
+
+				log.Printf("Item: %v", cseItem)
+
+				prefix := []byte(i.Image.ContextLink)
+
+				for k, _ := c.Seek(prefix); bytes.HasPrefix(k, prefix); k, _ = c.Next() {
+					found = true
+				}
+			}
+
+			// for debug
+			found = false
+
+			if !found {
+				log.Println("Get Image from cse search item!")
+				img = cseSearchItemToGIGImage(&cseItem)
+				break
+			}
+
+		}
 
 		return nil
 	}
@@ -207,7 +243,7 @@ func createSearchImageBuckets(tx *bolt.Tx) error {
 	var e error
 
 	_, e = tx.CreateBucketIfNotExists([]byte(CseSearchStartIndexBucket))
-	_, e = tx.CreateBucketIfNotExists([]byte(CseUsedImageIndexBucket))
+	_, e = tx.CreateBucketIfNotExists([]byte(CseUsedImageLinkBucket))
 
 	return e
 }

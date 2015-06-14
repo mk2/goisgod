@@ -1,4 +1,4 @@
-package goisgod
+package main
 
 import (
 	"image"
