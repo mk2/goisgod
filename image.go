@@ -1,10 +1,9 @@
-package main
+package goisgod
 
 import (
 	"bytes"
 	"encoding/json"
 	"image"
-	"image/draw"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -18,8 +17,13 @@ import (
 	_ "image/png"
 
 	"encoding/base64"
+
+	"errors"
+	"fmt"
+
 	"github.com/ChimeraCoder/anaconda"
 	"github.com/boltdb/bolt"
+	"github.com/disintegration/imaging"
 	"github.com/joeshaw/envdecode"
 )
 
@@ -92,11 +96,12 @@ func StartBot(imgch <-chan *image.Image) {
 
 	for {
 		img := <-imgch
+		slack.PostToSlack("Image incoming!!")
 		goimg := getGopherImage()
-		drawGopher(img, goimg)
+		drawd, _ := drawGopher(img, goimg)
 
 		imgBuf := new(bytes.Buffer)
-		if err := jpeg.Encode(imgBuf, *img, nil); err != nil {
+		if err := jpeg.Encode(imgBuf, drawd, nil); err != nil {
 			log.Fatalf("Jpeg encode failed")
 			continue
 		}
@@ -107,6 +112,7 @@ func StartBot(imgch <-chan *image.Image) {
 		v := url.Values{}
 		v.Add("media_ids", media.MediaIDString)
 		api.PostTweet("go is god", v)
+		slack.PostToSlack("Tweet Posted!!")
 	}
 }
 
@@ -121,7 +127,7 @@ func NewSearchImageChan(db *bolt.DB) <-chan *image.Image {
 
 	go func() {
 
-		var img image.Image
+		var img *image.Image = new(image.Image)
 
 		c := time.Tick(10 * time.Second)
 
@@ -130,16 +136,17 @@ func NewSearchImageChan(db *bolt.DB) <-chan *image.Image {
 			log.Printf("Now: %s", now)
 
 			db.Update(cseSearch(&img))
-			ch <- &img
 
+			if img != nil {
+				ch <- img
+			}
 		}
-
 	}()
 
 	return ch
 }
 
-func cseSearch(img *image.Image) func(*bolt.Tx) error {
+func cseSearch(img **image.Image) func(*bolt.Tx) error {
 
 	// https://www.googleapis.com/customsearch/v1?
 	// q=go+is+god&cx=007941957930256544000%3Axrdml4vkxxu&searchType=image&key={YOUR_API_KEY}
@@ -174,6 +181,14 @@ func cseSearch(img *image.Image) func(*bolt.Tx) error {
 			var result CseSearchResult
 			json.Unmarshal(bs, &result)
 
+			if result.ResultError != nil {
+				log.Printf("An Error occurred: %+v", result)
+
+				return errors.New(fmt.Sprintf("CseError: %+v", result.ResultError))
+			}
+
+			log.Printf("CseResult: %+v", result)
+
 			b := tx.Bucket([]byte(CseUsedImageLinkBucket))
 			c := b.Cursor()
 			found := false
@@ -195,8 +210,8 @@ func cseSearch(img *image.Image) func(*bolt.Tx) error {
 
 			if !found {
 				log.Println("Get Image from cse search item!")
-				img = cseSearchItemToGIGImage(&cseItem)
-				break
+				*img = cseSearchItemToGIGImage(&cseItem)
+				return nil
 			}
 
 		}
@@ -205,21 +220,18 @@ func cseSearch(img *image.Image) func(*bolt.Tx) error {
 	}
 }
 
-func drawGopher(_dst *image.Image, _gopher *image.Image) error {
+func drawGopher(_dst *image.Image, _gopher *image.Image) (image.Image, error) {
 
-	var (
-		dst    = (*_dst).(draw.Image)
-		gopher = (*_gopher).(draw.Image)
-	)
+	dst := imaging.Resize(*_dst, 300, 0, imaging.Lanczos)
 
-	draw.Draw(dst, dst.Bounds(), gopher, image.ZP, draw.Over)
+	ret := imaging.Overlay(dst, *_gopher, image.Pt(0, 0), 0.5)
 
-	return nil
+	return ret, nil
 }
 
 func getGopherImage() *image.Image {
 
-	f, _ := os.Open("gopher-normal.gif")
+	f, _ := os.Open("gopher-normal.png")
 	defer f.Close()
 	img, _, _ := image.Decode(f)
 

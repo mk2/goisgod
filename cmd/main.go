@@ -1,8 +1,10 @@
 package main
 
 import (
-	"github.com/boltdb/bolt"
 	"log"
+
+	"github.com/boltdb/bolt"
+	"github.com/mk2/goisgod"
 )
 
 func main() {
@@ -11,7 +13,7 @@ func main() {
 	defer db.Close()
 
 	log.Println("Go is God start")
-	ch := NewSearchImageChan(db)
-	StartBot(ch)
+	ch := goisgod.NewSearchImageChan(db)
+	goisgod.StartBot(ch)
 	log.Println("Go is God End")
 }
