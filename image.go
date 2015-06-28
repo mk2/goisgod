@@ -21,6 +21,8 @@ import (
 	"errors"
 	"fmt"
 
+	"strconv"
+
 	"github.com/ChimeraCoder/anaconda"
 	"github.com/boltdb/bolt"
 	"github.com/disintegration/imaging"
@@ -162,7 +164,11 @@ func cseSearch(img **image.Image) func(*bolt.Tx) error {
 
 	return func(tx *bolt.Tx) error {
 
-		var cseItem CseSearchItem
+		var (
+			cseItem CseSearchItem
+			start   int = 1
+			num     int = 10
+		)
 
 		for {
 
@@ -171,6 +177,7 @@ func cseSearch(img **image.Image) func(*bolt.Tx) error {
 			q.Set("cx", env.Cx)
 			q.Set("searchType", "image")
 			q.Set("key", env.Key)
+			q.Set("start", strconv.Itoa(start))
 
 			reqURL := CseEndpoint + "?" + q.Encode()
 			log.Printf("reqURL: %s", reqURL)
@@ -191,9 +198,12 @@ func cseSearch(img **image.Image) func(*bolt.Tx) error {
 
 			b := tx.Bucket([]byte(CseUsedImageLinkBucket))
 			c := b.Cursor()
-			found := false
+
 
 			for _, i := range result.Items {
+
+				found := false
+
 				cseItem = i
 
 				log.Printf("Item: %v", cseItem)
@@ -203,17 +213,18 @@ func cseSearch(img **image.Image) func(*bolt.Tx) error {
 				for k, _ := c.Seek(prefix); bytes.HasPrefix(k, prefix); k, _ = c.Next() {
 					found = true
 				}
+
+				if !found {
+					*img = cseSearchItemToGIGImage(&cseItem)
+					b.Put([]byte(cseItem.Image.ContextLink), []byte(""))
+					log.Println("Get Image from cse search item!")
+					return nil
+				}
 			}
 
-			// for debug
-			found = false
+			log.Println("Already used")
 
-			if !found {
-				log.Println("Get Image from cse search item!")
-				*img = cseSearchItemToGIGImage(&cseItem)
-				return nil
-			}
-
+			start += num
 		}
 
 		return nil
