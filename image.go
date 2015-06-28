@@ -131,7 +131,7 @@ func NewSearchImageChan(db *bolt.DB) <-chan *image.Image {
 
 		var img *image.Image = new(image.Image)
 
-		c := time.Tick(10 * time.Second)
+		c := time.Tick(3600 * time.Second)
 
 		for now := range c {
 
