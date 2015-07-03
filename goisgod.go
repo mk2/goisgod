@@ -39,24 +39,63 @@ func (gig *goisgod) loop() (ret int) {
 	imgpStoppingCh := make(chan struct{})
 	imgsStoppingCh := make(chan struct{})
 	gidStoppingCh := make(chan struct{})
-	invokeCh := make(chan struct{})
+	imgpInvokeCh := make(chan struct{})
+	imgsInvokeCh := make(chan struct{})
 
-	gig.imgp = NewImagePoster(dao, imgpStoppingCh, invokeCh)
-	gig.imgs = NewImageSearcher(dao, imgsStoppingCh, invokeCh)
+	gig.imgp = NewImagePoster(dao, imgpStoppingCh, imgpInvokeCh)
+	gig.imgs = NewImageSearcher(dao, imgsStoppingCh, imgsInvokeCh)
 	if gig.gid, err = NewGopherImageDrawer(dao, gidStoppingCh, gig.imgs.imageOutCh); err != nil {
 		ret = 1
 		return
 	}
 
+	go func() {
+
+		for {
+			c := time.Tick(30 * time.Second)
+
+			for now := range c {
+
+				log.Printf("Invoke ImageSearcher: %s", now)
+
+				// invoke image search routine, image posting routine
+				imgsInvokeCh <- struct{}{}
+			}
+		}
+	}()
+
+	go func() {
+		for {
+			c := time.Tick(10 * time.Second)
+
+			for now := range c {
+
+				log.Printf("Invoke ImagePoster: %s", now)
+
+				// invoke image search routine, image posting routine
+				imgpInvokeCh <- struct{}{}
+			}
+		}
+	}()
+
 	for {
-		c := time.Tick(10 * time.Second)
+		select {
 
-		for now := range c {
+		case <-gig.imgp.stoppedCh:
+			imgsStoppingCh <- struct{}{}
+			gidStoppingCh <- struct{}{}
+			break
 
-			log.Printf("Now: %s", now)
+		case <-gig.imgs.stoppedCh:
+			imgpStoppingCh <- struct{}{}
+			gidStoppingCh <- struct{}{}
+			break
 
-			// invoke image search routine, image posting routine
-			invokeCh <- struct{}{}
+		case <-gig.gid.stoppedCh:
+			imgpStoppingCh <- struct{}{}
+			gidStoppingCh <- struct{}{}
+			break
+
 		}
 	}
 
