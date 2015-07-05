@@ -76,27 +76,31 @@ func (dao *GigDao) storeImage(img *GigImage, key string) error {
 	})
 }
 
-func (dao *GigDao) retreiveImage(key string) (*GigImage, error) {
+func (dao *GigDao) retrieveImage(key string) (*GigImage, error) {
 
 	img := new(GigImage)
 	err := dao.db.View(func(tx *bolt.Tx) (err error) {
 
 		var b *bolt.Bucket
-		if b, err = tx.CreateBucketIfNotExists(bucketTypeToByte(ImageBucket)); err != nil {
-			return
+		if b = tx.Bucket(bucketTypeToByte(ImageBucket)); b == nil {
+			return errors.New("bucket not found")
 		}
 
 		var bs []byte
 		if bs = b.Get([]byte(key)); bs == nil {
+			log.Printf("image %s not found", key)
 			err = errors.New("not found image of: " + key)
 			return
 		}
+
 
 		if err = img.fromByte(bs); err != nil {
 			return
 		}
 
 		img.key = key
+
+		log.Printf("image %s found", key)
 
 		return nil
 	})
@@ -109,7 +113,7 @@ func randomTrue() bool {
 	return rand.Intn(3)%2 == 0
 }
 
-func (dao *GigDao) retreiveRandomImage() (*GigImage, error) {
+func (dao *GigDao) retrieveRandomImage() (*GigImage, error) {
 
 	img := new(GigImage)
 	err := dao.db.Update(func(tx *bolt.Tx) (err error) {
@@ -134,7 +138,6 @@ func (dao *GigDao) retreiveRandomImage() (*GigImage, error) {
 			}
 		}
 
-		log.Printf("bs: %v", bs)
 		log.Printf("key: %v", string(k))
 
 		if err = img.fromByte(bs); err != nil {

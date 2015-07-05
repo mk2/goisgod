@@ -37,7 +37,8 @@ func NewGopherImageDrawer(dao *GigDao, stoppingCh <-chan struct{}, rawImageInCh 
 					gid.stoppedCh <- struct{}{}
 					break
 				} else {
-					gid.dao.storeImage(gimg, gimg.key)
+					log.Printf("save new gopher drawed image")
+					gid.dao.storeImage(gimg, img.key)
 				}
 
 			case <-stoppingCh:

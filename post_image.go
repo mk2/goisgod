@@ -69,7 +69,7 @@ func (imgp *ImagePoster) post() (err error) {
 	slack.PostToSlack("Image incoming!!")
 
 	var gimg *GigImage
-	if gimg, err = imgp.dao.retreiveRandomImage(); err != nil {
+	if gimg, err = imgp.dao.retrieveRandomImage(); err != nil {
 		log.Printf("Error: %v", err)
 		return
 	}

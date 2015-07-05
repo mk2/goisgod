@@ -118,16 +118,18 @@ func (imgs *ImageSearcher) cseSearch() (gimg *GigImage, err error) {
 		log.Fatalf("google custom engine environment required")
 	}
 
-	q := url.Values{}
-	q.Set("q", "go is god")
-	q.Set("cx", env.Cx)
-	q.Set("searchType", "image")
-	q.Set("key", env.Key)
-	q.Set("start", strconv.Itoa(start))
 
-	var reqURL string
-
+GET_IMAGE:
 	for {
+
+		q := url.Values{}
+		q.Set("q", "go is god")
+		q.Set("cx", env.Cx)
+		q.Set("searchType", "image")
+		q.Set("key", env.Key)
+		q.Set("start", strconv.Itoa(start))
+
+		var reqURL string
 
 		reqURL = CseEndpoint + "?" + q.Encode()
 		log.Printf("reqURL: %s", reqURL)
@@ -163,16 +165,18 @@ func (imgs *ImageSearcher) cseSearch() (gimg *GigImage, err error) {
 
 			log.Printf("key: %s", key)
 
-			if gimg, err = imgs.dao.retreiveImage(key); err == nil {
+			if gimg, err = imgs.dao.retrieveImage(key); err == nil {
+				log.Printf("*** already searched image")
 				continue
 			}
 			if gimg.image, err = cseSearchItemToGigImage(&cseItem); err == nil {
+				log.Printf("Got new image!")
 				gimg.key = key
-				break
+				break GET_IMAGE
 			}
 		}
 
-		break
+		start += 10
 	}
 
 	return
