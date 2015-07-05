@@ -6,6 +6,8 @@ import (
 
 	"github.com/boltdb/bolt"
 	"log"
+	"math/rand"
+	"time"
 )
 
 // BucketType is used to specify bucket of boltDB
@@ -70,7 +72,6 @@ func (dao *GigDao) storeImage(img *GigImage, key string) error {
 			return
 		}
 
-
 		return nil
 	})
 }
@@ -103,6 +104,11 @@ func (dao *GigDao) retreiveImage(key string) (*GigImage, error) {
 	return img, err
 }
 
+func randomTrue() bool {
+	rand.Seed(time.Now().UnixNano())
+	return rand.Intn(3)%2 == 0
+}
+
 func (dao *GigDao) retreiveRandomImage() (*GigImage, error) {
 
 	img := new(GigImage)
@@ -119,9 +125,12 @@ func (dao *GigDao) retreiveRandomImage() (*GigImage, error) {
 		)
 		c := b.Cursor()
 
-		for k, bs = c.First(); k != nil; c.Next() {
-			if bs != nil {
-				break
+	RANDOM_IMAGE:
+		for {
+			for k, bs = c.First(); k != nil; c.Next() {
+				if randomTrue() && bs != nil {
+					break RANDOM_IMAGE
+				}
 			}
 		}
 

@@ -77,3 +77,4 @@ crashlytics-build.properties
 
 *.boltdb
 *.sublime-workspace
+cmd/start.sh
