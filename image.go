@@ -6,8 +6,8 @@ import (
 
 	// require
 	_ "image/gif"
-	_ "image/png"
 	"image/jpeg"
+	_ "image/png"
 )
 
 type GigImage struct {
@@ -29,14 +29,18 @@ func (gimg *GigImage) toByte() (bs []byte, err error) {
 
 func (gimg *GigImage) fromByte(bs []byte) (err error) {
 
+	var img image.Image
+
 	buf := new(bytes.Buffer)
-	if _, err = buf.Read(bs); err != nil {
+	if _, err = buf.Write(bs); err != nil {
 		return
 	}
 
-	if *gimg.image, err = jpeg.Decode(buf); err != nil {
+	if img, err = jpeg.Decode(buf); err != nil {
 		return
 	}
+
+	gimg.image = &img
 
 	return
 }

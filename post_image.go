@@ -21,6 +21,8 @@ type ImagePoster struct {
 // NewImagePoster is used to post image to twitter
 func NewImagePoster(dao *GigDao, stoppingCh <-chan struct{}, invokeCh <-chan struct{}) (imgp *ImagePoster) {
 
+	imgp = new(ImagePoster)
+
 	imgp.dao = dao
 	imgp.stoppedCh = make(chan struct{}, 1)
 
@@ -45,7 +47,7 @@ func NewImagePoster(dao *GigDao, stoppingCh <-chan struct{}, invokeCh <-chan str
 			select {
 
 			case <-invokeCh:
-				if err := imgp.post(&GigImage{}); err != nil {
+				if err := imgp.post(); err != nil {
 					imgp.stoppedCh <- struct{}{}
 					break
 				}
@@ -62,12 +64,18 @@ func NewImagePoster(dao *GigDao, stoppingCh <-chan struct{}, invokeCh <-chan str
 	return
 }
 
-func (imgp *ImagePoster) post(img *GigImage) (err error) {
+func (imgp *ImagePoster) post() (err error) {
 
 	slack.PostToSlack("Image incoming!!")
 
+	var gimg *GigImage
+	if gimg, err = imgp.dao.retreiveRandomImage(); err != nil {
+		log.Printf("Error: %v", err)
+		return
+	}
+
 	imgBuf := new(bytes.Buffer)
-	if err := jpeg.Encode(imgBuf, *img.image, nil); err != nil {
+	if err := jpeg.Encode(imgBuf, *gimg.image, nil); err != nil {
 		log.Fatalf("Jpeg encode failed")
 	}
 

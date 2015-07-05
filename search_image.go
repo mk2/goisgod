@@ -63,24 +63,31 @@ type ImageSearcher struct {
 // NewImageSearcher is used to search image from some search engine
 func NewImageSearcher(dao *GigDao, stoppingCh <-chan struct{}, invokeCh <-chan struct{}) (imgs *ImageSearcher) {
 
+	imgs = new(ImageSearcher)
+
 	imgs.dao = dao
 	imgs.stoppedCh = make(chan struct{}, 1)
 	imgs.imageOutCh = make(chan *GigImage, 1)
 
 	go func() {
 
-		select {
+		for {
+			select {
 
-		case <-invokeCh:
-			if err := imgs.search(); err != nil {
+			case <-invokeCh:
+				if gimg, err := imgs.search(); err != nil {
+					imgs.stoppedCh <- struct{}{}
+					break
+				} else {
+					log.Printf("Save Image")
+					imgs.imageOutCh <- gimg
+				}
+
+			case <-stoppingCh:
 				imgs.stoppedCh <- struct{}{}
 				break
+
 			}
-
-		case <-stoppingCh:
-			imgs.stoppedCh <- struct{}{}
-			break
-
 		}
 
 	}()
@@ -88,12 +95,14 @@ func NewImageSearcher(dao *GigDao, stoppingCh <-chan struct{}, invokeCh <-chan s
 	return
 }
 
-func (imgs *ImageSearcher) search() (err error) {
+func (imgs *ImageSearcher) search() (*GigImage, error) {
 
-	return
+	return imgs.cseSearch()
 }
 
-func (imgs *ImageSearcher) cseSearch() (err error) {
+func (imgs *ImageSearcher) cseSearch() (gimg *GigImage, err error) {
+
+	gimg = new(GigImage)
 
 	var (
 		cseItem CseSearchItem
@@ -116,54 +125,62 @@ func (imgs *ImageSearcher) cseSearch() (err error) {
 	q.Set("key", env.Key)
 	q.Set("start", strconv.Itoa(start))
 
-	reqURL := CseEndpoint + "?" + q.Encode()
-	log.Printf("reqURL: %s", reqURL)
-
-	var resp *http.Response
-	if resp, err = http.Get(reqURL); err != nil {
-		return
-	}
-
-	var bs []byte
-	if bs, err = ioutil.ReadAll(resp.Body); err != nil {
-		return
-	}
-
-	var result CseSearchResult
-	if err = json.Unmarshal(bs, &result); err != nil {
-		return
-	}
-
-	if result.ResultError != nil {
-
-		log.Printf("An Error occurred: %+v", result)
-		return errors.New(fmt.Sprintf("CseError: %+v", result.ResultError))
-	}
+	var reqURL string
 
 	for {
 
-		log.Printf("CseResult: %+v", result)
+		reqURL = CseEndpoint + "?" + q.Encode()
+		log.Printf("reqURL: %s", reqURL)
+
+		var resp *http.Response
+		if resp, err = http.Get(reqURL); err != nil {
+			return
+		}
+
+		var bs []byte
+		if bs, err = ioutil.ReadAll(resp.Body); err != nil {
+			return
+		}
+
+		var result CseSearchResult
+		if err = json.Unmarshal(bs, &result); err != nil {
+			return
+		}
+
+		if result.ResultError != nil {
+			log.Printf("An Error occurred: %+v", result)
+			err = errors.New(fmt.Sprintf("CseError: %+v", result.ResultError))
+			return
+		}
+
+		// log.Printf("CseResult: %+v", result)
 
 		for _, cseItem = range result.Items {
 
-			log.Printf("Item: %v", cseItem)
+			// log.Printf("Item: %v", cseItem)
 
 			key := cseItem.Image.ContextLink
 
-			var gimg *GigImage
+			log.Printf("key: %s", key)
+
 			if gimg, err = imgs.dao.retreiveImage(key); err == nil {
 				continue
 			}
-			if gimg.image, err = cseSearchItemToGigImage(&cseItem); err != nil {
-				return
+			if gimg.image, err = cseSearchItemToGigImage(&cseItem); err == nil {
+				gimg.key = key
+				break
 			}
-
 		}
 
+		break
 	}
+
+	return
 }
 
 func cseSearchItemToGigImage(res *CseSearchItem) (img *image.Image, err error) {
+
+	img = new(image.Image)
 
 	var resp *http.Response
 	if resp, err = http.Get(res.Image.ThumbnailLink); err != nil {

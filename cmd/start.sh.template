@@ -1,0 +1,24 @@
+#!/bin/sh
+
+# Golang
+# export GOPATH=
+# export GOROOT=
+# export PATH=
+
+# twitter(go_is_god)
+export TWITTER_CONSUMER_KEY=
+export TWITTER_CONSUMER_SECRET=
+export TWITTER_ACCESS_TOKEN=
+export TWITTER_ACCESS_TOKEN_SECRET=
+
+# google custom search api key
+export CSE_CX=
+export CSE_KEY=
+
+# slack (for go_is_god)
+export GOISGOD_SLACK_URL=
+
+# goisgod
+export GIG=./goisgod
+
+$($GIG)

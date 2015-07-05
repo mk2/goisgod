@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/boltdb/bolt"
+	"log"
 )
 
 // BucketType is used to specify bucket of boltDB
@@ -50,6 +51,8 @@ func (dao *GigDao) Close() error {
 
 func (dao *GigDao) storeImage(img *GigImage, key string) error {
 
+	log.Printf("will be stored image key: %s", key)
+
 	return dao.db.Update(func(tx *bolt.Tx) (err error) {
 
 		var b *bolt.Bucket
@@ -63,8 +66,10 @@ func (dao *GigDao) storeImage(img *GigImage, key string) error {
 		}
 
 		if err = b.Put([]byte(key), bs); err != nil {
+			log.Printf("Error: %v", err)
 			return
 		}
+
 
 		return nil
 	})
@@ -73,7 +78,7 @@ func (dao *GigDao) storeImage(img *GigImage, key string) error {
 func (dao *GigDao) retreiveImage(key string) (*GigImage, error) {
 
 	img := new(GigImage)
-	err := dao.db.Update(func(tx *bolt.Tx) (err error) {
+	err := dao.db.View(func(tx *bolt.Tx) (err error) {
 
 		var b *bolt.Bucket
 		if b, err = tx.CreateBucketIfNotExists(bucketTypeToByte(ImageBucket)); err != nil {
@@ -91,6 +96,43 @@ func (dao *GigDao) retreiveImage(key string) (*GigImage, error) {
 		}
 
 		img.key = key
+
+		return nil
+	})
+
+	return img, err
+}
+
+func (dao *GigDao) retreiveRandomImage() (*GigImage, error) {
+
+	img := new(GigImage)
+	err := dao.db.Update(func(tx *bolt.Tx) (err error) {
+
+		var b *bolt.Bucket
+		if b, err = tx.CreateBucketIfNotExists(bucketTypeToByte(ImageBucket)); err != nil {
+			return
+		}
+
+		var (
+			k  []byte
+			bs []byte
+		)
+		c := b.Cursor()
+
+		for k, bs = c.First(); k != nil; c.Next() {
+			if bs != nil {
+				break
+			}
+		}
+
+		log.Printf("bs: %v", bs)
+		log.Printf("key: %v", string(k))
+
+		if err = img.fromByte(bs); err != nil {
+			return
+		}
+
+		img.key = string(k)
 
 		return nil
 	})

@@ -5,16 +5,19 @@ import (
 	"os"
 
 	"github.com/disintegration/imaging"
+	"log"
 )
 
 type GopherImageDrawer struct {
-	gopher           *image.Image
-	dao              *GigDao
-	stoppedCh        chan<- struct{}
+	gopher    *image.Image
+	dao       *GigDao
+	stoppedCh chan struct{}
 }
 
 // NewGopherImageDrawer is used to draw gopher via image input channel
 func NewGopherImageDrawer(dao *GigDao, stoppingCh <-chan struct{}, rawImageInCh <-chan *GigImage) (gid *GopherImageDrawer, err error) {
+
+	gid = new(GopherImageDrawer)
 
 	if gid.gopher, err = gid.getGopherImage(); err != nil {
 		return
@@ -29,12 +32,12 @@ func NewGopherImageDrawer(dao *GigDao, stoppingCh <-chan struct{}, rawImageInCh 
 			select {
 
 			case img := <-rawImageInCh:
+				log.Printf("Image incoming")
 				if gimg, err := gid.drawGopher(img); err != nil {
-					gid.dao.storeImage(gimg, gimg.key)
 					gid.stoppedCh <- struct{}{}
 					break
 				} else {
-					// save image
+					gid.dao.storeImage(gimg, gimg.key)
 				}
 
 			case <-stoppingCh:
@@ -49,6 +52,8 @@ func NewGopherImageDrawer(dao *GigDao, stoppingCh <-chan struct{}, rawImageInCh 
 }
 
 func (gid *GopherImageDrawer) getGopherImage() (img *image.Image, err error) {
+
+	img = new(image.Image)
 
 	var f *os.File
 	if f, err = os.Open("gopher-normal.png"); err != nil {

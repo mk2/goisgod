@@ -52,7 +52,7 @@ func (gig *goisgod) loop() (ret int) {
 	go func() {
 
 		for {
-			c := time.Tick(30 * time.Second)
+			c := time.Tick(3 * time.Second)
 
 			for now := range c {
 
@@ -66,7 +66,7 @@ func (gig *goisgod) loop() (ret int) {
 
 	go func() {
 		for {
-			c := time.Tick(10 * time.Second)
+			c := time.Tick(3 * time.Second)
 
 			for now := range c {
 
